@@ -15,5 +15,8 @@ COPY ./faster_whisper_server ./faster_whisper_server
 ENV WHISPER__MODEL=Systran/faster-distil-whisper-large-v3
 ENV WHISPER__INFERENCE_DEVICE=auto
 ENV UVICORN_HOST=0.0.0.0
-ENV UVICORN_PORT=8000
+ENV UVICORN_PORT=8080
+
+EXPOSE 8080
 CMD ["uvicorn", "faster_whisper_server.main:app"]
+

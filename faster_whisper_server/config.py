@@ -169,8 +169,8 @@ class Config(BaseSettings):
 
     log_level: str = "debug"
     host: str = Field(alias="UVICORN_HOST", default="0.0.0.0")
-    port: int = Field(alias="UVICORN_PORT", default=8000)
-    allow_origins: list[str] | None = None
+    port: int = Field(alias="UVICORN_PORT", default=8080)
+    allow_origins: list[str] | None = ["*"]
     """
     https://docs.pydantic.dev/latest/concepts/pydantic_settings/#parsing-environment-variable-values
     Usage:
@@ -178,13 +178,13 @@ class Config(BaseSettings):
         `export ALLOW_ORIGINS='["*"]'`
     """
 
-    enable_ui: bool = True
+    enable_ui: bool = False
     """
     Whether to enable the Gradio UI. You may want to disable this if you want to minimize the dependencies.
     """
 
     default_language: Language | None = None
-    default_response_format: ResponseFormat = ResponseFormat.JSON
+    default_response_format: ResponseFormat = ResponseFormat.VERBOSE_JSON
     whisper: WhisperConfig = WhisperConfig()
     max_models: int = 1
     max_no_data_seconds: float = 1.0

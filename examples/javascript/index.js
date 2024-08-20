@@ -25,21 +25,30 @@ ffmpeg.setFfmpegPath(ffmpegPath);
  * @param {string} responseFormat - Response format
  * @param {string} temperature - Temperature setting
  */
-async function transcribeFile(filePath, model, language, responseFormat, temperature) {
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath));
-    formData.append('model', model);
-    formData.append('language', language);
-    formData.append('response_format', responseFormat);
-    formData.append('temperature', temperature);
+async function transcribeFile(
+  filePath,
+  model,
+  language,
+  responseFormat,
+  temperature
+) {
+  const formData = new FormData();
+  formData.append('file', fs.createReadStream(filePath));
+  formData.append('model', model);
+  formData.append('language', language);
+  formData.append('response_format', responseFormat);
+  formData.append('temperature', temperature);
 
-    const response = await fetch(`${process.env.TRANSCRIPTION_API_BASE_URL}/v1/audio/transcriptions`, {
-        method: 'POST',
-        body: formData,
-    });
+  const response = await fetch(
+    `${process.env.TRANSCRIPTION_API_BASE_URL}/v1/audio/transcriptions`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
 
-    const transcription = await response.json();
-    console.log('Transcription Response:', transcription);
+  const transcription = await response.json();
+  console.log('Transcription Response:', transcription);
 }
 
 /**
@@ -55,19 +64,22 @@ async function transcribeFile(filePath, model, language, responseFormat, tempera
  * @param {string} temperature - Temperature setting
  */
 async function translateFile(filePath, model, responseFormat, temperature) {
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath));
-    formData.append('model', model);
-    formData.append('response_format', responseFormat);
-    formData.append('temperature', temperature);
+  const formData = new FormData();
+  formData.append('file', fs.createReadStream(filePath));
+  formData.append('model', model);
+  formData.append('response_format', responseFormat);
+  formData.append('temperature', temperature);
 
-    const response = await fetch(`${process.env.TRANSLATION_API_BASE_URL}/v1/audio/translations`, {
-        method: 'POST',
-        body: formData,
-    });
+  const response = await fetch(
+    `${process.env.TRANSLATION_API_BASE_URL}/v1/audio/translations`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
 
-    const translation = await response.json();
-    console.log('Translation Response:', translation);
+  const translation = await response.json();
+  console.log('Translation Response:', translation);
 }
 
 /**
@@ -81,27 +93,39 @@ async function translateFile(filePath, model, responseFormat, temperature) {
  * @param {string} responseFormat - Response format
  * @param {string} temperature - Temperature setting
  */
-async function sendAudioOverWebSocket(filePath, model, language, responseFormat, temperature) {
-    const wsUrl = `ws://100.105.162.69:8000/v1/audio/transcriptions?model=${encodeURIComponent(model)}&language=${encodeURIComponent(language)}&response_format=${encodeURIComponent(responseFormat)}&temperature=${encodeURIComponent(temperature)}`;
-    const ws = new WebSocket(wsUrl);
+async function sendAudioOverWebSocket(
+  filePath,
+  model,
+  language,
+  responseFormat,
+  temperature
+) {
+  const wsUrl = `ws://100.105.162.69:8080/v1/audio/transcriptions?model=${encodeURIComponent(
+    model
+  )}&language=${encodeURIComponent(
+    language
+  )}&response_format=${encodeURIComponent(
+    responseFormat
+  )}&temperature=${encodeURIComponent(temperature)}`;
+  const ws = new WebSocket(wsUrl);
 
-    ws.on('open', async () => {
-        const audioBuffer = fs.readFileSync(filePath);
-        ws.send(audioBuffer);
-    });
+  ws.on('open', async () => {
+    const audioBuffer = fs.readFileSync(filePath);
+    ws.send(audioBuffer);
+  });
 
-    ws.on('message', (message) => {
-        const response = JSON.parse(message);
-        console.log('WebSocket Response:', response);
-    });
+  ws.on('message', (message) => {
+    const response = JSON.parse(message);
+    console.log('WebSocket Response:', response);
+  });
 
-    ws.on('close', () => {
-        console.log('WebSocket connection closed');
-    });
+  ws.on('close', () => {
+    console.log('WebSocket connection closed');
+  });
 
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-    });
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
 }
 
 /**
@@ -111,46 +135,58 @@ async function sendAudioOverWebSocket(filePath, model, language, responseFormat,
  * @returns {string} - Path to the converted PCM file
  */
 async function convertToPcm(filePath) {
-    const pcmFilePath = filePath.replace(path.extname(filePath), '.pcm');
+  const pcmFilePath = filePath.replace(path.extname(filePath), '.pcm');
 
-    await new Promise((resolve, reject) => {
-        ffmpeg(filePath)
-            .audioChannels(1)
-            .audioFrequency(16000)
-            .audioCodec('pcm_s16le')
-            .toFormat('s16le')
-            .on('end', () => {
-                console.log(`Audio file successfully converted to PCM: ${pcmFilePath}`);
-                resolve(pcmFilePath);
-            })
-            .on('error', (error) => {
-                console.error(`Error converting audio to PCM: ${error.message}`);
-                reject(error);
-            })
-            .save(pcmFilePath);
-    });
+  await new Promise((resolve, reject) => {
+    ffmpeg(filePath)
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .audioCodec('pcm_s16le')
+      .toFormat('s16le')
+      .on('end', () => {
+        console.log(`Audio file successfully converted to PCM: ${pcmFilePath}`);
+        resolve(pcmFilePath);
+      })
+      .on('error', (error) => {
+        console.error(`Error converting audio to PCM: ${error.message}`);
+        reject(error);
+      })
+      .save(pcmFilePath);
+  });
 
-    return pcmFilePath;
+  return pcmFilePath;
 }
 
 async function main() {
-    const model = 'Systran/faster-whisper-large-v3';
-    const language = 'en';
-    const responseFormat = 'json';
-    const temperature = '0';
-    const filePath = './path/to/your/audio.webm';  // Replace with the actual file path
+  const model = 'Systran/faster-whisper-large-v3';
+  const language = 'en';
+  const responseFormat = 'json';
+  const temperature = '0';
+  const filePath = './path/to/your/audio.webm'; // Replace with the actual file path
 
-    // Convert the audio file to PCM format
-    const pcmFilePath = await convertToPcm(filePath);
+  // Convert the audio file to PCM format
+  const pcmFilePath = await convertToPcm(filePath);
 
-    // Transcribe the audio file using the HTTP endpoint
-    await transcribeFile(pcmFilePath, model, language, responseFormat, temperature);
+  // Transcribe the audio file using the HTTP endpoint
+  await transcribeFile(
+    pcmFilePath,
+    model,
+    language,
+    responseFormat,
+    temperature
+  );
 
-    // Translate the audio file using the HTTP endpoint
-    await translateFile(pcmFilePath, model, responseFormat, temperature);
+  // Translate the audio file using the HTTP endpoint
+  await translateFile(pcmFilePath, model, responseFormat, temperature);
 
-    // Transcribe the audio file using the WebSocket endpoint
-    await sendAudioOverWebSocket(pcmFilePath, model, language, responseFormat, temperature);
+  // Transcribe the audio file using the WebSocket endpoint
+  await sendAudioOverWebSocket(
+    pcmFilePath,
+    model,
+    language,
+    responseFormat,
+    temperature
+  );
 }
 
 // Make sure to use ffmpeg version 7 or above. The default apt-get install only installs version 4.x. Also, Ubuntu 22.04 or above is required to support version 7.x.

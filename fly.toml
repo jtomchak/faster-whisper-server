@@ -1,0 +1,42 @@
+# fly.toml app configuration file generated for faster-whisper-server-patient-voice-8559 on 2024-08-15T15:43:02-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'faster-whisper-server-patient-voice-8559'
+primary_region = 'ord'
+
+
+[build]
+  dockerfile = 'Dockerfile.cuda'
+
+[[mounts]]
+    source = 'data'
+    destination = '.cache/huggingface'
+    initial_size = '10G'
+
+[env]
+  WHISPER__MODEL = 'Systran/faster-distil-whisper-large-v3'
+  WHISPER__INFERENCE_DEVICE = 'auto'
+  UVICORN_HOST = '0.0.0.0'
+  UVICORN_PORT = '8080'
+
+
+[http_service]
+  internal_port = 8080
+  force_https = false
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[http_service.concurrency]
+  type = "requests"
+  # Fly Proxy uses this limit to determine Machine excess capacity
+  soft_limit = 250
+
+[[vm]]
+  size = "performance-4x"
+  memory = "8gb"
+  gpu_kind = "a100-pcie-40gb"
+

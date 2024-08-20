@@ -24,9 +24,9 @@ See [OpenAI API reference](https://platform.openai.com/docs/api-reference/audio)
 
 Using Docker
 ```bash
-docker run --gpus=all --publish 8000:8000 --volume ~/.cache/huggingface:/root/.cache/huggingface fedirz/faster-whisper-server:latest-cuda
+docker run --gpus=all --publish 8080:8080 --volume ~/.cache/huggingface:/root/.cache/huggingface fedirz/faster-whisper-server:latest-cuda
 # or
-docker run --publish 8000:8000 --volume ~/.cache/huggingface:/root/.cache/huggingface fedirz/faster-whisper-server:latest-cpu
+docker run --publish 8080:8080 --volume ~/.cache/huggingface:/root/.cache/huggingface fedirz/faster-whisper-server:latest-cpu
 ```
 Using Docker Compose
 ```bash
@@ -41,7 +41,7 @@ If you are looking for a step-by-step walkthrough, checkout [this](https://www.y
 ### OpenAI API CLI
 ```bash
 export OPENAI_API_KEY="cant-be-empty"
-export OPENAI_BASE_URL=http://localhost:8000/v1/
+export OPENAI_BASE_URL=http://localhost:8080/v1/
 ```
 ```bash
 openai api audio.transcriptions.create -m Systran/faster-distil-whisper-large-v3 -f audio.wav --response-format text
@@ -52,7 +52,7 @@ openai api audio.translations.create -m Systran/faster-distil-whisper-large-v3 -
 ```python
 from openai import OpenAI
 
-client = OpenAI(api_key="cant-be-empty", base_url="http://localhost:8000/v1/")
+client = OpenAI(api_key="cant-be-empty", base_url="http://localhost:8080/v1/")
 
 audio_file = open("audio.wav", "rb")
 transcript = client.audio.transcriptions.create(
@@ -64,14 +64,14 @@ print(transcript.text)
 ### CURL
 ```bash
 # If `model` isn't specified, the default model is used
-curl http://localhost:8000/v1/audio/transcriptions -F "file=@audio.wav"
-curl http://localhost:8000/v1/audio/transcriptions -F "file=@audio.mp3"
-curl http://localhost:8000/v1/audio/transcriptions -F "file=@audio.wav" -F "stream=true"
-curl http://localhost:8000/v1/audio/transcriptions -F "file=@audio.wav" -F "model=Systran/faster-distil-whisper-large-v3"
+curl http://localhost:8080/v1/audio/transcriptions -F "file=@audio.wav"
+curl http://localhost:8080/v1/audio/transcriptions -F "file=@audio.mp3"
+curl http://localhost:8080/v1/audio/transcriptions -F "file=@audio.wav" -F "stream=true"
+curl http://localhost:8080/v1/audio/transcriptions -F "file=@audio.wav" -F "model=Systran/faster-distil-whisper-large-v3"
 # It's recommended that you always specify the language as that will reduce the transcription time
-curl http://localhost:8000/v1/audio/transcriptions -F "file=@audio.wav" -F "language=en"
+curl http://localhost:8080/v1/audio/transcriptions -F "file=@audio.wav" -F "language=en"
 
-curl http://localhost:8000/v1/audio/translations -F "file=@audio.wav"
+curl http://localhost:8080/v1/audio/translations -F "file=@audio.wav"
 ```
 
 ### Live Transcription (using Web Socket)
@@ -82,5 +82,5 @@ https://github.com/fedirz/faster-whisper-server/assets/76551385/e334c124-af61-41
 [websocat](https://github.com/vi/websocat?tab=readme-ov-file#installation) installation is required.
 Live transcribing audio data from a microphone.
 ```bash
-ffmpeg -loglevel quiet -f alsa -i default -ac 1 -ar 16000 -f s16le - | websocat --binary ws://localhost:8000/v1/audio/transcriptions
+ffmpeg -loglevel quiet -f alsa -i default -ac 1 -ar 16000 -f s16le - | websocat --binary ws://localhost:8080/v1/audio/transcriptions
 ```
