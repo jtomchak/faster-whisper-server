@@ -1,4 +1,4 @@
-# NOTE: arm images haven't been tested
+# TODO: https://docs.astral.sh/uv/guides/integration/docker/#configuring-watch-with-docker-compose
 services:
   faster-whisper-server-cuda:
     image: fedirz/faster-whisper-server:latest-cuda
@@ -8,11 +8,11 @@ services:
       platforms:
         - linux/amd64
         - linux/arm64
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
     ports:
       - 8080:8080
+    volumes:
+      - hugging_face_cache:/root/.cache/huggingface
     develop:
       watch:
         - path: faster_whisper_server
@@ -22,6 +22,12 @@ services:
         reservations:
           devices:
             - capabilities: ["gpu"]
+              # If you have CDI feature enabled use the following instead
+              # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html
+              # https://docs.docker.com/reference/cli/dockerd/#enable-cdi-devices
+              # - driver: cdi
+              #   device_ids:
+              #   - nvidia.com/gpu=all
   faster-whisper-server-cpu:
     image: fedirz/faster-whisper-server:latest-cpu
     build:
@@ -30,12 +36,14 @@ services:
       platforms:
         - linux/amd64
         - linux/arm64
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
     ports:
       - 8080:8080
+    volumes:
+      - hugging_face_cache:/root/.cache/huggingface
     develop:
       watch:
         - path: faster_whisper_server
           action: rebuild
+volumes:
+  hugging_face_cache:

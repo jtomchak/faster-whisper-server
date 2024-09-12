@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
+from contextlib import asynccontextmanager
+import gc
 from io import BytesIO
 import time
 from typing import TYPE_CHECKING, Annotated, Literal
@@ -23,8 +25,10 @@ from fastapi.websockets import WebSocketState
 from faster_whisper import WhisperModel
 from faster_whisper.vad import VadOptions, get_speech_timestamps
 import huggingface_hub
+from huggingface_hub.hf_api import RepositoryNotFoundError
 from pydantic import AfterValidator
 
+from faster_whisper_server import hf_utils
 from faster_whisper_server.asr import FasterWhisperASR
 from faster_whisper_server.audio import AudioStream, audio_samples_from_file
 from faster_whisper_server.config import (
@@ -45,7 +49,7 @@ from faster_whisper_server.server_models import (
 from faster_whisper_server.transcriber import audio_transcriber
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import AsyncGenerator, Generator, Iterable
 
     from faster_whisper.transcribe import TranscriptionInfo
     from huggingface_hub.hf_api import ModelInfo
@@ -63,11 +67,14 @@ def load_model(model_name: str) -> WhisperModel:
         del loaded_models[oldest_model_name]
     logger.debug(f"Loading {model_name}...")
     start = time.perf_counter()
-    # NOTE: will raise an exception if the model name isn't valid
+    # NOTE: will raise an exception if the model name isn't valid. Should I do an explicit check?
     whisper = WhisperModel(
         model_name,
         device=config.whisper.inference_device,
+        device_index=config.whisper.device_index,
         compute_type=config.whisper.compute_type,
+        cpu_threads=config.whisper.cpu_threads,
+        num_workers=config.whisper.num_workers,
     )
     logger.info(
         f"Loaded {model_name} loaded in {time.perf_counter() - start:.2f} seconds. {config.whisper.inference_device}({config.whisper.compute_type}) will be used for inference."  # noqa: E501
@@ -78,7 +85,15 @@ def load_model(model_name: str) -> WhisperModel:
 
 logger.debug(f"Config: {config}")
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    for model_name in config.preload_models:
+        load_model(model_name)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 if config.allow_origins is not None:
     app.add_middleware(
@@ -95,11 +110,45 @@ def health() -> Response:
     return Response(status_code=200, content="OK")
 
 
+@app.post("/api/pull/{model_name:path}", tags=["experimental"], summary="Download a model from Hugging Face.")
+def pull_model(model_name: str) -> Response:
+    if hf_utils.does_local_model_exist(model_name):
+        return Response(status_code=200, content="Model already exists")
+    try:
+        huggingface_hub.snapshot_download(model_name, repo_type="model")
+    except RepositoryNotFoundError as e:
+        return Response(status_code=404, content=str(e))
+    return Response(status_code=201, content="Model downloaded")
+
+
+@app.get("/api/ps", tags=["experimental"], summary="Get a list of loaded models.")
+def get_running_models() -> dict[str, list[str]]:
+    return {"models": list(loaded_models.keys())}
+
+
+@app.post("/api/ps/{model_name:path}", tags=["experimental"], summary="Load a model into memory.")
+def load_model_route(model_name: str) -> Response:
+    if model_name in loaded_models:
+        return Response(status_code=409, content="Model already loaded")
+    load_model(model_name)
+    return Response(status_code=201)
+
+
+@app.delete("/api/ps/{model_name:path}", tags=["experimental"], summary="Unload a model from memory.")
+def stop_running_model(model_name: str) -> Response:
+    model = loaded_models.get(model_name)
+    if model is not None:
+        del loaded_models[model_name]
+        gc.collect()
+        return Response(status_code=204)
+    return Response(status_code=404)
+
+
 @app.get("/v1/models")
 def get_models() -> ModelListResponse:
     models = huggingface_hub.list_models(library="ctranslate2", tags="automatic-speech-recognition", cardData=True)
     models = list(models)
-    models.sort(key=lambda model: model.downloads, reverse=True)
+    models.sort(key=lambda model: model.downloads, reverse=True)  # type: ignore  # noqa: PGH003
     transformed_models: list[ModelObject] = []
     for model in models:
         assert model.created_at is not None
@@ -131,7 +180,7 @@ def get_model(
         model_name=model_name, library="ctranslate2", tags="automatic-speech-recognition", cardData=True
     )
     models = list(models)
-    models.sort(key=lambda model: model.downloads, reverse=True)
+    models.sort(key=lambda model: model.downloads, reverse=True)  # type: ignore  # noqa: PGH003
     if len(models) == 0:
         raise HTTPException(status_code=404, detail="Model doesn't exists")
     exact_match: ModelInfo | None = None
