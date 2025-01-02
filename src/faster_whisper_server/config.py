@@ -1,5 +1,5 @@
 import enum
-from typing import Self
+from typing import Self, Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -230,6 +230,7 @@ class Config(BaseSettings):
     Controls how many latest seconds of audio are being passed through VAD.
     Should be greater than `max_inactivity_seconds`
     """
+    api_key: Optional[str] = Field(alias='API_KEY', default=None)
 
     @model_validator(mode="after")
     def ensure_preloaded_models_is_lte_max_models(self) -> Self:

@@ -18,6 +18,8 @@ from fastapi import (
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
+    Depends,
+    Security,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -27,6 +29,7 @@ from faster_whisper.vad import VadOptions, get_speech_timestamps
 import huggingface_hub
 from huggingface_hub.hf_api import RepositoryNotFoundError
 from pydantic import AfterValidator
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from faster_whisper_server import hf_utils
 from faster_whisper_server.asr import FasterWhisperASR
@@ -55,6 +58,20 @@ if TYPE_CHECKING:
     from huggingface_hub.hf_api import ModelInfo
 
 loaded_models: OrderedDict[str, WhisperModel] = OrderedDict()
+
+security = HTTPBearer()
+
+
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> bool:
+    """Verify that the API key is valid."""
+    if config.api_key is None:
+        return True
+    if credentials.credentials != config.api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API key"
+        )
+    return True
 
 
 def load_model(model_name: str) -> WhisperModel:
@@ -326,6 +343,7 @@ def transcribe_file(
     ] = ["segment"],
     stream: Annotated[bool, Form()] = False,
     hotwords: Annotated[str | None, Form()] = None,
+    authenticated: bool = Depends(verify_api_key),
 ) -> Response | StreamingResponse:
     whisper = load_model(model)
     segments, transcription_info = whisper.transcribe(
