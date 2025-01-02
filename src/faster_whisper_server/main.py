@@ -20,6 +20,7 @@ from fastapi import (
     WebSocketDisconnect,
     Depends,
     Security,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -110,7 +111,24 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title="Faster Whisper Server",
+    description="""
+    A FastAPI server for Whisper ASR using faster-whisper.
+    
+    ## Authentication
+    
+    All endpoints (except /health) require authentication if the API_KEY environment variable is set.
+    To authenticate, include a Bearer token in the Authorization header:
+    
+    ```
+    Authorization: Bearer your-api-key-here
+    ```
+    
+    If API_KEY is not set, authentication is disabled and all endpoints are publicly accessible.
+    """,
+)
 
 if config.allow_origins is not None:
     app.add_middleware(
@@ -128,7 +146,10 @@ def health() -> Response:
 
 
 @app.post("/api/pull/{model_name:path}", tags=["experimental"], summary="Download a model from Hugging Face.")
-def pull_model(model_name: str) -> Response:
+def pull_model(
+    model_name: str,
+    authenticated: bool = Depends(verify_api_key)
+) -> Response:
     if hf_utils.does_local_model_exist(model_name):
         return Response(status_code=200, content="Model already exists")
     try:
@@ -139,12 +160,15 @@ def pull_model(model_name: str) -> Response:
 
 
 @app.get("/api/ps", tags=["experimental"], summary="Get a list of loaded models.")
-def get_running_models() -> dict[str, list[str]]:
+def get_running_models(authenticated: bool = Depends(verify_api_key)) -> dict[str, list[str]]:
     return {"models": list(loaded_models.keys())}
 
 
 @app.post("/api/ps/{model_name:path}", tags=["experimental"], summary="Load a model into memory.")
-def load_model_route(model_name: str) -> Response:
+def load_model_route(
+    model_name: str,
+    authenticated: bool = Depends(verify_api_key)
+) -> Response:
     if model_name in loaded_models:
         return Response(status_code=409, content="Model already loaded")
     load_model(model_name)
@@ -152,7 +176,10 @@ def load_model_route(model_name: str) -> Response:
 
 
 @app.delete("/api/ps/{model_name:path}", tags=["experimental"], summary="Unload a model from memory.")
-def stop_running_model(model_name: str) -> Response:
+def stop_running_model(
+    model_name: str,
+    authenticated: bool = Depends(verify_api_key)
+) -> Response:
     model = loaded_models.get(model_name)
     if model is not None:
         del loaded_models[model_name]
@@ -162,7 +189,7 @@ def stop_running_model(model_name: str) -> Response:
 
 
 @app.get("/v1/models")
-def get_models() -> ModelListResponse:
+def get_models(authenticated: bool = Depends(verify_api_key)) -> ModelListResponse:
     models = huggingface_hub.list_models(library="ctranslate2", tags="automatic-speech-recognition", cardData=True)
     models = list(models)
     models.sort(key=lambda model: model.downloads, reverse=True)  # type: ignore  # noqa: PGH003
@@ -192,6 +219,7 @@ def get_models() -> ModelListResponse:
 # NOTE: `examples` doesn't work https://github.com/tiangolo/fastapi/discussions/10537
 def get_model(
     model_name: Annotated[str, Path(example="Systran/faster-distil-whisper-large-v3")],
+    authenticated: bool = Depends(verify_api_key)
 ) -> ModelObject:
     models = huggingface_hub.list_models(
         model_name=model_name, library="ctranslate2", tags="automatic-speech-recognition", cardData=True
@@ -307,6 +335,7 @@ def translate_file(
     response_format: Annotated[ResponseFormat, Form()] = config.default_response_format,
     temperature: Annotated[float, Form()] = 0.0,
     stream: Annotated[bool, Form()] = False,
+    authenticated: bool = Depends(verify_api_key),
 ) -> Response | StreamingResponse:
     whisper = load_model(model)
     segments, transcription_info = whisper.transcribe(
@@ -402,6 +431,21 @@ async def transcribe_stream(
     response_format: Annotated[ResponseFormat, Query()] = config.default_response_format,
     temperature: Annotated[float, Query()] = 0.0,
 ) -> None:
+    # For WebSocket endpoints, we need to handle authentication before accepting the connection
+    try:
+        auth_header = ws.headers.get('Authorization')
+        if config.api_key is not None:
+            if not auth_header or not auth_header.startswith('Bearer '):
+                await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+            token = auth_header.split(' ')[1]
+            if token != config.api_key:
+                await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+    except Exception:
+        await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await ws.accept()
     transcribe_opts = {
         "language": language,
