@@ -4,20 +4,28 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/test.yaml"
   pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/test.yaml"
 jobs:
   pytest:
     strategy:
+      fail-fast: false # Continue running jobs even if one fails
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v2
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "0.4.4"
+          version: "0.4.11"
           enable-cache: true
       - run: uv python install 3.12
-      - run: uv sync --extra dev
-      # TODO: figure out why `pytest` doesn't discover tests in `faster_whisper_server` directory by itself
-      - run: uv run pytest src/faster_whisper_server/* tests
+      - run: uv sync --all-extras
+      - run: uv run pytest -m "not requires_openai"

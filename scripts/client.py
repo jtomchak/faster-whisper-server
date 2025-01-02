@@ -36,8 +36,11 @@ TRANSCRIBE_PATH = "/audio/transcriptions?language=en"
 USER = "nixos"
 TIMEOUT = httpx.Timeout(None)
 KEYBIND = "ctrl+x"
-LANGUAGE = "en"
-RESPONSE_FORMAT = "text"
+REQUEST_KWARGS = {
+    "language": "en",
+    "response_format": "text",
+    "vad_filter": True,
+}
 
 client = httpx.Client(base_url=OPENAI_BASE_URL, timeout=TIMEOUT)
 is_running = threading.Event()
@@ -64,15 +67,12 @@ while True:
     print(f"Recording finished. File size: {file.stat().st_size} bytes")
 
     try:
-        with open(file, "rb") as fd:
+        with file.open("rb") as fd:
             start = time.perf_counter()
             res = client.post(
                 OPENAI_BASE_URL + TRANSCRIBE_PATH,
                 files={"file": fd},
-                data={
-                    "response_format": RESPONSE_FORMAT,
-                    "language": LANGUAGE,
-                },
+                data=REQUEST_KWARGS,
             )
         end = time.perf_counter()
         print(f"Transcription took {end - start} seconds")

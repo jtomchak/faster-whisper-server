@@ -2,34 +2,46 @@
 name = "faster-whisper-server"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
+# https://packaging.python.org/en/latest/specifications/version-specifiers/#id5
 dependencies = [
-    "pydantic==2.9.0",
-    "fastapi==0.112.4",
-    "uvicorn==0.30.6",
-    "python-multipart==0.0.9",
-    "soundfile==0.12.1",
-    "pydantic-settings==2.4.0",
-    "numpy<2.0.0",
-    "faster-whisper==1.0.3",
-    "huggingface-hub==0.24.6",
-    "httpx-sse==0.4.0",
-    "httpx==0.27.2",
-    "gradio==4.42.0",
-    "openai==1.43.1",
+    "ctranslate2>=4.5.0",
+    "fastapi>=0.115.0",
+    "faster-whisper>=1.0.3",
+    "huggingface-hub>=0.25.1",
+    "numpy>=2.1.1",
+    "piper-phonemize ; platform_machine == 'x86_64'",
+    "piper-tts>=1.2.0 ; platform_machine == 'x86_64'",
+    "pydantic-settings>=2.5.2",
+    "pydantic>=2.9.0",
+    "python-multipart>=0.0.10",
+    "sounddevice>=0.5.1",
+    "soundfile>=0.12.1",
+    "uvicorn>=0.30.6",
 ]
 
 [project.optional-dependencies]
 client = [
-    "keyboard==0.13.5",
+    "keyboard>=0.13.5",
 ]
 dev = [
-    "ruff==0.5.3",
-    "pytest==8.3.2",
-    "webvtt-py==0.5.1",
-    "srt==3.5.3",
-    "basedpyright==1.13.0",
-    "pytest-xdist==3.6.1",
+    "anyio>=4.4.0",
+    "basedpyright>=1.18.0",
+    "pytest-antilru>=2.0.0",
+    "mkdocs-material>=9.5.39",
+    "mkdocstrings[python]>=0.26.1",
     "pytest-asyncio>=0.24.0",
+    "pytest-xdist>=3.6.1",
+    "pytest>=8.3.3",
+    "ruff>=0.7.1",
+    "srt>=3.5.3",
+    "webvtt-py>=0.5.1",
+    "pre-commit>=4.0.1",
+]
+ui = [
+    "gradio>=5.0.2",
+    "httpx>=0.27.2",
+    "httpx-sse>=0.4.0",
+    "openai>=1.48.0",
 ]
 
 [build-system]
@@ -47,11 +59,9 @@ ignore = [
     "FIX",
     "TD", # disable todo warnings
     "ERA",  # allow commented out code
-    "PTH",
 
     "ANN003", # missing kwargs
     "ANN101", # missing self type
-    "ANN102", # missing cls
     "B006",
     "B008",
     "COM812", # trailing comma
@@ -75,6 +85,7 @@ ignore = [
     "ISC001", # recommended to disable for formatting
     "INP001",
     "PT018",
+    "G004", # logging f string
 ]
 
 [tool.ruff.lint.isort]
@@ -97,3 +108,21 @@ pythonPlatform = "Linux"
 # https://github.com/DetachHead/basedpyright?tab=readme-ov-file#pre-commit-hook
 venvPath = "."
 venv = ".venv"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function" # this fixes pytest warning
+filterwarnings = [
+    'ignore::DeprecationWarning'
+]
+# https://docs.pytest.org/en/stable/how-to/mark.html#registering-marks
+markers = [
+    "requires_openai",
+]
+
+[tool.uv.sources]
+piper-phonemize = { url = "https://github.com/fedirz/piper-phonemize/raw/refs/heads/master/dist/piper_phonemize-1.2.0-cp312-cp312-manylinux_2_28_x86_64.whl" }
+
+[[tool.uv.dependency-metadata]]
+name = "piper-tts"
+version = "1.2.0"
+requires-dist = ["piper-phonemize"]

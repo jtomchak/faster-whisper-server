@@ -1,23 +1,25 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from faster_whisper_server.audio import Audio, AudioStream
-from faster_whisper_server.config import config
-from faster_whisper_server.core import Transcription, Word, common_prefix, to_full_sentences, word_to_text
-from faster_whisper_server.logger import logger
+from faster_whisper_server.text_utils import Transcription, common_prefix, to_full_sentences, word_to_text
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from faster_whisper_server.api_models import TranscriptionWord
     from faster_whisper_server.asr import FasterWhisperASR
+
+logger = logging.getLogger(__name__)
 
 
 class LocalAgreement:
     def __init__(self) -> None:
         self.unconfirmed = Transcription()
 
-    def merge(self, confirmed: Transcription, incoming: Transcription) -> list[Word]:
+    def merge(self, confirmed: Transcription, incoming: Transcription) -> list[TranscriptionWord]:
         # https://github.com/ufal/whisper_streaming/blob/main/whisper_online.py#L264
         incoming = incoming.after(confirmed.end - 0.1)
         prefix = common_prefix(incoming.words, self.unconfirmed.words)
@@ -47,11 +49,12 @@ def prompt(confirmed: Transcription) -> str | None:
 async def audio_transcriber(
     asr: FasterWhisperASR,
     audio_stream: AudioStream,
+    min_duration: float,
 ) -> AsyncGenerator[Transcription, None]:
     local_agreement = LocalAgreement()
     full_audio = Audio()
     confirmed = Transcription()
-    async for chunk in audio_stream.chunks(config.min_duration):
+    async for chunk in audio_stream.chunks(min_duration):
         full_audio.extend(chunk)
         audio = full_audio.after(needs_audio_after(confirmed))
         transcription, _ = await asr.transcribe(audio, prompt(confirmed))
