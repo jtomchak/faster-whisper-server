@@ -168,6 +168,10 @@ class WhisperConfig(BaseModel):
     -1: Never unload the model.
     0: Unload the model immediately after usage.
     """
+    use_batched_mode: bool = False
+    """
+    Whether to use batch mode(introduced in 1.1.0 `faster-whisper` release) for inference. This will likely become the default in the future and the configuration option will be removed.
+    """  # noqa: E501
 
 
 class Config(BaseSettings):
@@ -183,8 +187,8 @@ class Config(BaseSettings):
     api_key: str | None = None
     log_level: str = "debug"
     host: str = Field(alias="UVICORN_HOST", default="0.0.0.0")
-    port: int = Field(alias="UVICORN_PORT", default=8080)
-    allow_origins: list[str] | None = ["*"]
+    port: int = Field(alias="UVICORN_PORT", default=8000)
+    allow_origins: list[str] | None = None
     """
     https://docs.pydantic.dev/latest/concepts/pydantic_settings/#parsing-environment-variable-values
     Usage:
@@ -192,7 +196,7 @@ class Config(BaseSettings):
         `export ALLOW_ORIGINS='["*"]'`
     """
 
-    enable_ui: bool = False
+    enable_ui: bool = True
     """
     Whether to enable the Gradio UI. You may want to disable this if you want to minimize the dependencies.
     """
@@ -202,7 +206,7 @@ class Config(BaseSettings):
     Default language to use for transcription. If not set, the language will be detected automatically.
     It is recommended to set this as it will improve the performance.
     """
-    default_response_format: ResponseFormat = ResponseFormat.VERBOSE_JSON
+    default_response_format: ResponseFormat = ResponseFormat.JSON
     whisper: WhisperConfig = WhisperConfig()
     preload_models: list[str] = Field(
         default_factory=list,
@@ -232,3 +236,14 @@ class Config(BaseSettings):
     Controls how many latest seconds of audio are being passed through VAD.
     Should be greater than `max_inactivity_seconds`
     """
+
+    chat_completion_base_url: str = "https://api.openai.com/v1"
+    chat_completion_api_key: str | None = None
+
+    speech_base_url: str | None = None
+    speech_api_key: str | None = None
+    speech_model: str = "piper"
+    speech_extra_body: dict = {"sample_rate": 24000}
+
+    transcription_base_url: str | None = None
+    transcription_api_key: str | None = None

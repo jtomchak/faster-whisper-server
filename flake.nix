@@ -21,12 +21,16 @@
           default = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               act
+              cudaPackages_12.cudnn
+              cudaPackages_12.libcublas
               ffmpeg-full
               go-task
+              grafana-loki
               parallel
               pv
               python312
-              rsync
+              tempo
+              uv
               websocat
               uv
               cudaPackages_12.cudnn

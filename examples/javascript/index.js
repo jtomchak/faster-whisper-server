@@ -96,7 +96,7 @@ async function sendAudioOverWebSocket(
   responseFormat,
   temperature
 ) {
-  const wsUrl = `ws://100.105.162.69:8080/v1/audio/transcriptions?model=${encodeURIComponent(
+  const wsUrl = `ws://100.105.162.69:8000/v1/audio/transcriptions?model=${encodeURIComponent(
     model
   )}&language=${encodeURIComponent(
     language
